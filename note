@@ -39,7 +39,9 @@ object StorageLevel {
 }
 """2 table不宜做太复杂的操作，计算很慢
 """3如何优雅地终止正在运行的Spark Streaming程序 https://www.iteblog.com/archives/1890.html
-"""
+"""4.通过SparkContext的setJobGroup方法为每个Job设置不同的JobGroup，自己维护一个列表，记录这些JobGroup，并记录启动时间。
+写个定时器，定期扫描已经JobGroup列表，对于>=5min的任务调用SparkContext的cancelJobGroup方法kill掉就可以了（
+如果任务已经执行完了，调用改方法也没啥副作用），最后将超过5min的JobGroup信息从列表移除就可以了。
 """
 """
 """
