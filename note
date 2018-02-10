@@ -38,10 +38,28 @@ object StorageLevel {
   ......
 }
 """2 table不宜做太复杂的操作，计算很慢
+
 """3如何优雅地终止正在运行的Spark Streaming程序 https://www.iteblog.com/archives/1890.html
+
 """4.通过SparkContext的setJobGroup方法为每个Job设置不同的JobGroup，自己维护一个列表，记录这些JobGroup，并记录启动时间。
 写个定时器，定期扫描已经JobGroup列表，对于>=5min的任务调用SparkContext的cancelJobGroup方法kill掉就可以了（
 如果任务已经执行完了，调用改方法也没啥副作用），最后将超过5min的JobGroup信息从列表移除就可以了。
-"""
+
+
+"""5使用spark sql访问hive的表，然后根据一批id把需要的数据过滤出来，本来是非常简单的需求直接使用下面的伪SQL即可：
+select * from table where  id in (id1,id2,id3,id4,idn)
+但现在遇到的问题是id条件比较多，大概有几万个，这样量级的in是肯定会出错的，看网上文章hive的in查询超过3000个就报错了。
+如何解决？
+主要有两种解决方法：
+
+（一）分批执行，就是把几万个id，按3000一组查询一次，最后把所有的查询结果在汇合起来。
+
+（二）使用join，把几万个id创建成一张hive表，然后两表关联，可以一次性把结果给获取到。
+
+这里倾向于第二种解决办法，比较灵活和方便扩展，尽量不要把数据集分散，一旦分散意味着客户端需要做更多的工作来合并结果集，
+比如随便一个sum或者dinstict，如果是第一种则需要在最终的结果集再次sum或者distinct。
+下面看看如何使用第二种解决：
+由于我们id列表是动态的，每个任务的id列表都有可能变换，所以要满足第二种方法，就得把他们变成一张临时表存储在内存中，
+当spark任务停止时，就自动销毁，因为他们不需要持久化到硬盘上。
 """
 """
