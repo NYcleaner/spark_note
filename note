@@ -46,7 +46,8 @@ object StorageLevel {
 如果任务已经执行完了，调用改方法也没啥副作用），最后将超过5min的JobGroup信息从列表移除就可以了。
 
 
-"""5使用spark sql访问hive的表，然后根据一批id把需要的数据过滤出来，本来是非常简单的需求直接使用下面的伪SQL即可：
+"""5http://blog.csdn.net/u010454030/article/details/78925143
+使用spark sql访问hive的表，然后根据一批id把需要的数据过滤出来，本来是非常简单的需求直接使用下面的伪SQL即可：
 select * from table where  id in (id1,id2,id3,id4,idn)
 但现在遇到的问题是id条件比较多，大概有几万个，这样量级的in是肯定会出错的，看网上文章hive的in查询超过3000个就报错了。
 如何解决？
