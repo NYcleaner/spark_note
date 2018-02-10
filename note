@@ -38,7 +38,7 @@ object StorageLevel {
   ......
 }
 """2 table不宜做太复杂的操作，计算很慢
-"""
+"""3如何优雅地终止正在运行的Spark Streaming程序 https://www.iteblog.com/archives/1890.html
 """
 """
 """
