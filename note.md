@@ -46,7 +46,7 @@ df.select(*[col expression for col in col_list])
  写个定时器，定期扫描已经JobGroup列表，对于>=5min的任务调用SparkContext的cancelJobGroup方法kill掉就可以了（
 如果任务已经执行完了，调用改方法也没啥副作用），最后将超过5min的JobGroup信息从列表移除就可以了。
 
-## 5.面对选择条件是，sql小trick
+## 5.面对选择条件时，sql小trick
 http://blog.csdn.net/u010454030/article/details/78925143
 使用spark sql访问hive的表，然后根据一批id把需要的数据过滤出来，本来是非常简单的需求直接使用下面的伪SQL即可：
 select * from table where  id in (id1,id2,id3,id4,idn)
