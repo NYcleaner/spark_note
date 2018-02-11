@@ -1,6 +1,6 @@
-"""1 
-http://bit1129.iteye.com/blog/2182146
-http://blog.csdn.net/qq_20641565/article/details/76216417
+## 1 
+(http://bit1129.iteye.com/blog/2182146)
+(http://blog.csdn.net/qq_20641565/article/details/76216417)
 cache和persist的区别了：cache只有一个默认的缓存级别MEMORY_ONLY ，而persist可以根据情况设置其它的缓存级别。
 cache()与persist()：
 会被重复使用的(但是)不能太大的RDD需要cache。cache 只使用 memory，写磁盘的话那就叫 checkpoint 了。 哪些 RDD 需要 checkpoint？
@@ -10,19 +10,13 @@ cache 机制是每计算出一个要 cache 的 partition 就直接将其 cache �
 而是等到 job 结束后另外启动专门的 job 去完成 checkpoint 。 也就是说需要 checkpoint 的 RDD 会被计算两次。
 因此，在使用 rdd.checkpoint() 的时候，建议加上 rdd.cache()， 这样第二次运行的 job 就不用再去计算该 rdd 了，直接读取 cache 写磁盘。
 cache 与 checkpoint 的区别:
-关于这个问题，Tathagata Das 有一段回答: There is a significant difference between cache and checkpoint. 
-Cache materializes the RDD and keeps it in memory and/or disk（其实只有 memory）. 
-But the lineage（也就是 computing chain） of RDD (that is, seq of operations that generated the RDD) will be remembered, 
-so that if there are node failures and parts of the cached RDDs are lost, they can be regenerated. However, 
-checkpoint saves the RDD to an HDFS file and actually forgets the lineage completely. 
+关于这个问题，Tathagata Das 有一段回答:
+> There is a significant difference between cache and checkpoint. Cache materializes the RDD and keeps it in memory and/or disk（其实只有 memory）. But the lineage（也就是 computing chain） of RDD (that is, seq of operations that generated the RDD) will be remembered, 
+so that if there are node failures and parts of the cached RDDs are lost, they can be regenerated. However, checkpoint saves the RDD to an HDFS file and actually forgets the lineage completely. 
 This is allows long lineages to be truncated and the data to be saved reliably in HDFS (which is naturally fault tolerant by replication). 
-persist()与checkpoint()
-深入一点讨论，rdd.persist(StorageLevel.DISK_ONLY) 与 checkpoint 也有区别。前者虽然可以将 RDD 的 partition 持久化到磁盘，
-但该 partition 由 blockManager 管理。一旦 driver program 执行结束，也就是 executor 所在进程 CoarseGrainedExecutorBackend stop，blockManager 也会 stop，
-被 cache 到磁盘上的 RDD 也会被清空（整个 blockManager 使用的 local 文件夹被删除）。而 checkpoint 将 RDD 持久化到 HDFS 或本地文件夹，
-如果不被手动 remove 掉（ 话说怎么 remove checkpoint 过的 RDD？ ），是一直存在的，也就是说可以被下一个 driver program 使用，
+>persist()与checkpoint() 深入一点讨论，rdd.persist(StorageLevel.DISK_ONLY) 与 checkpoint 也有区别。前者虽然可以将 RDD 的 partition 持久化到磁盘，但该 partition 由 blockManager 管理。一旦 driver program 执行结束，也就是 executor 所在进程 CoarseGrainedExecutorBackend stop，blockManager 也会 stop，被 cache 到磁盘上的 RDD 也会被清空（整个 blockManager 使用的 local 文件夹被删除）。而 checkpoint 将 RDD 持久化到 HDFS 或本地文件夹，如果不被手动 remove 掉（ 话说怎么 remove checkpoint 过的 RDD？ ），是一直存在的，也就是说可以被下一个 driver program 使用，
 而 cached RDD 不能被其他 dirver program 使用。
-object StorageLevel {
+'''object StorageLevel {
   val NONE = new StorageLevel(false, false, false, false)
   val DISK_ONLY = new StorageLevel(true, false, false, false)
   val DISK_ONLY_2 = new StorageLevel(true, false, false, false, 2)
@@ -37,30 +31,33 @@ object StorageLevel {
   val OFF_HEAP = new StorageLevel(false, false, true, false)
   ......
 }
-"""2 table不宜做太复杂的操作，计算很慢
+'''
+## 2 dataframetable不宜做太复杂的操作，计算很慢.
+使用迭代
+"""
+df.select(*[col expression for col in col_list])
+"""
 
-"""3如何优雅地终止正在运行的Spark Streaming程序 https://www.iteblog.com/archives/1890.html
+## 3如何优雅地终止正在运行的Spark Streaming程序 
+(https://www.iteblog.com/archives/1890.html)
 
-"""4.通过SparkContext的setJobGroup方法为每个Job设置不同的JobGroup，自己维护一个列表，记录这些JobGroup，并记录启动时间。
-写个定时器，定期扫描已经JobGroup列表，对于>=5min的任务调用SparkContext的cancelJobGroup方法kill掉就可以了（
+## 4.定时任务
+通过SparkContext的setJobGroup方法为每个Job设置不同的JobGroup，自己维护一个列表，记录这些JobGroup，并记录启动时间。
+ 写个定时器，定期扫描已经JobGroup列表，对于>=5min的任务调用SparkContext的cancelJobGroup方法kill掉就可以了（
 如果任务已经执行完了，调用改方法也没啥副作用），最后将超过5min的JobGroup信息从列表移除就可以了。
 
-
-"""5http://blog.csdn.net/u010454030/article/details/78925143
+## 5.面对选择条件是，sql小trick
+http://blog.csdn.net/u010454030/article/details/78925143
 使用spark sql访问hive的表，然后根据一批id把需要的数据过滤出来，本来是非常简单的需求直接使用下面的伪SQL即可：
 select * from table where  id in (id1,id2,id3,id4,idn)
 但现在遇到的问题是id条件比较多，大概有几万个，这样量级的in是肯定会出错的，看网上文章hive的in查询超过3000个就报错了。
 如何解决？
 主要有两种解决方法：
-
 （一）分批执行，就是把几万个id，按3000一组查询一次，最后把所有的查询结果在汇合起来。
-
 （二）使用join，把几万个id创建成一张hive表，然后两表关联，可以一次性把结果给获取到。
-
 这里倾向于第二种解决办法，比较灵活和方便扩展，尽量不要把数据集分散，一旦分散意味着客户端需要做更多的工作来合并结果集，
 比如随便一个sum或者dinstict，如果是第一种则需要在最终的结果集再次sum或者distinct。
 下面看看如何使用第二种解决：
 由于我们id列表是动态的，每个任务的id列表都有可能变换，所以要满足第二种方法，就得把他们变成一张临时表存储在内存中，
 当spark任务停止时，就自动销毁，因为他们不需要持久化到硬盘上。
-"""
-"""
+
