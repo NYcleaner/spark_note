@@ -61,3 +61,31 @@ select * from table where  id in (id1,id2,id3,id4,idn)
 由于我们id列表是动态的，每个任务的id列表都有可能变换，所以要满足第二种方法，就得把他们变成一张临时表存储在内存中，
 当spark任务停止时，就自动销毁，因为他们不需要持久化到硬盘上。
 
+
+## 5.配置CDH
+
+'''
+export http_proxy=http://
+export https_proxy=http://
+export ftp_proxy=http://
+
+export JAVA_HOME=/usr/java/jdk1.8.0_73
+export CDH_HOME=/opt/cloudera/parcels/CDH
+export SPARK2_HOME=/opt/cloudera/parcels/SPARK2
+export KYLIN_HOME=/hadoop/kylin/apache-kylin-1.6.0-cdh5.7-bin
+export HBASE_HOME=/opt/cloudera/parcels/CDH/lib/hbase
+export HADOOP_HOME=/opt/cloudera/parcels/CDH/lib/hadoop
+export HIVE_HOME=/opt/cloudera/parcels/CDH/lib/hive
+export HADOOP_CMD=/opt/cloudera/parcels/CDH/lib/opt/bin/hadoop
+export HCAT_HOME=/opt/cloudera/parcels/CDH/lib/hive-hcatalog
+export JAVA_LIBRARY_PATH=$JAVA_LIBRARY_PATH:$HADOOP_HOME/lib/native
+export SPARK_YARN_USER_ENV="JAVA_LIBRARY_PATH=$JAVA_LIBRARY_PATH,LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+export hive_dependency=$HIVE_HOME/conf:$HIVE_HOME/lib/*:/opt/cloudera/parcels/CDH/lib/hive-hcatalog/share/hcatalog/hive-hcatalog-core-1.1.0-cdh5.13.0.jar
+export PATH=$JAVA_HOME/bin:$KYLIN_HOME/bin:$HADOOP_HOME/bin:$HBASE_HOME/bin:$HIVE_HOME/bin:$SCALA_HOME/bin:$PATH
+export YARN_HOME=$HADOOP_HOME
+export YARN_CONF_DIR=${YARN_HOME}/etc/hadoop
+export CLASS_PATH=.:/usr/share/cmf/lib:$JAVA_HOME/lib:$SPARK_HOME/jars:$HBASE_HOME:$HBASE_HOME/lib:$HADOOP_HOME/share/hadoop/common/lib:$CLASS_PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HADOOP_HOME/lib:$HBASE_HOME/lib:$SPARK_HOME/jars:$SCALA_HOME/lib:$HADOOP_HOME/lib/native
+
+export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME}/bin/hadoop classpath):$HBASE_HOME/lib/*:/hadoop/spark_python_deps/*
+'''
