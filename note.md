@@ -89,3 +89,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HADOOP_HOME/lib:$HBASE_HOME/lib:$SPARK_
 
 export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME}/bin/hadoop classpath):$HBASE_HOME/lib/*:/hadoop/spark_python_deps/*
 '''
+
+###6 select
+"""
+sqlContext.sql(s"SELECT count from mytable WHERE id=$id")
+"""
