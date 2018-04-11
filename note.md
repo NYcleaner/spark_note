@@ -94,3 +94,45 @@ export SPARK_DIST_CLASSPATH=$(${HADOOP_HOME}/bin/hadoop classpath):$HBASE_HOME/l
 """
 sqlContext.sql(s"SELECT count from mytable WHERE id=$id")
 """
+
+
+###6 spark和hadoop生态系统的调优
+"""
+现象：
+通过spark2-submit提交的程序，运行到tasks到199/200的时候，就一直等到，不再输出日志。
+	spark2-submit  --master yarn  --num-executors 3  --executor-cores 2  --jars /home/fastjson-1.2.47.jar --class com.klclear.data.hbase.KLServer /home/kldata-_2.11-0.1.jar
+
+检查：
+通过netstat -antp | grep 2181 查看发现很多等待zookeeper的连接
+
+
+通过日志发现有如下错误：
+18/04/08 14:50:50 INFO zookeeper.ClientCnxn: Socket connection established, initiating session, client: /172.16.222.228:54948, server: test1/172.16.222.228:2181
+18/04/08 14:50:50 INFO zookeeper.ClientCnxn: Unable to read additional data from server sessionid 0x0, likely server has closed socket, closing socket connection and attempting reconnect
+18/04/08 14:50:51 INFO zookeeper.ClientCnxn: Opening socket connection to server test3/172.16.222.230:2181. Will not attempt to authenticate using SASL (unknown error)
+18/04/08 14:50:51 INFO zookeeper.ClientCnxn: Socket connection established, initiating session, client: /172.16.222.228:39384, server: test3/172.16.222.230:2181
+
+
+18/04/08 14:56:54 WARN zookeeper.ClientCnxn: Session 0x0 for server test1/172.16.222.228:2181, unexpected error, closing socket connection and attempting reconnect
+java.io.IOException: Connection reset by peer
+at sun.nio.ch.FileDispatcherImpl.read0(Native Method)
+at sun.nio.ch.SocketDispatcher.read(SocketDispatcher.java:39)
+at sun.nio.ch.IOUtil.readIntoNativeBuffer(IOUtil.java:223)
+at sun.nio.ch.IOUtil.read(IOUtil.java:192)
+at sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:380)
+at org.apache.zookeeper.ClientCnxnSocketNIO.doIO(ClientCnxnSocketNIO.java:68)
+at org.apache.zookeeper.ClientCnxnSocketNIO.doTransport(ClientCnxnSocketNIO.java:355)
+at org.apache.zookeeper.ClientCnxn$SendThread.run(ClientCnxn.java:1081)
+
+综合分析zookeeper连接达到最大值之后， spark的程序一直等待zookeeper的连接，通过增加zookeeper的maxClientCnxns来更改。
+更改之后，spark程序运行的速度提高，对应的task不再pending。
+
+Spark环境组件很多，涉及各日志很多，检查日志可以帮助定位问题的。
+Spark的环境参数，会很大影响程序运行效率，Spark调优需要深入研究。
+
+
+参考：
+https://blog.csdn.net/hengyunabc/article/details/41450003
+http://812893004-qq-com.iteye.com/blog/2323574
+
+"""
