@@ -136,3 +136,5 @@ https://blog.csdn.net/hengyunabc/article/details/41450003
 http://812893004-qq-com.iteye.com/blog/2323574
 
 """
+
+###7.Union can only be performed on tables with the same number of columns,
