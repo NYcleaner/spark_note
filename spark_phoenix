@@ -1,0 +1,148 @@
+现有环境版本：
+1)spark: 2.1.0.cloudera
+2)hbase:1.2.0+cdh5.13.0
+实验⼀一： 整合spark1.6，使⽤用官⽅方编译的版本: 4.13.2-cdh5.11.2 ：通过
+1,下载、安装
+Cd /opt/cloudera/parcel-repo
+Wget https://mirrors.tuna.tsinghua.edu.cn/apache/phoenix/apache-phoenix-4.13.2-cdh5.11.2/parcels/APACHE_PHOENIX-4.13.2-
+cdh5.11.2.p0.0-el7.parcel
+⽣生成sha⽂文件
+Sha1sum APACHE_PHOENIX-4.13.2-cdh5.11.2.p0.0-el7.parcel APACHE_PHOENIX-4.13.2-cdh5.11.2.p0.0-el7.parcel.sha
+修改：
+vim APACHE_PHOENIX-4.13.2-cdh5.11.2.p0.0-el7.parcel.sha
+
+拷⻉贝⽂文件：（同样的集群中每台机器器也⼀一样操作）
+ln -s /opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.13.2-cdh5.11.2-server.jar
+/opt/cloudera/parcels/CDH/lib/hbase/lib/phoenix-4.13.2-cdh5.11.2-server.jar
+2 重启Hbase
+启动客户端验证：
+cd /opt/cloudera/parcels/APACHE_PHOENIX/bin
+./phoenix-sqlline.py test3:2181
+如果HBase没有重启好，也会报如下错误：
+org.apache.hadoop.hbase.DoNotRetryIOException: org.apache.hadoop.hbase.DoNotRetryIOException: SYSTEM.CATALOG:
+org.apache.hadoop.hbase.client.Scan.setRaw(Z)Lorg/apache/hadoop/hbase/client/Scan;
+at org.apache.phoenix.util.ServerUtil.createIOException(ServerUtil.java:96)
+at org.apache.phoenix.coprocessor.MetaDataEndpointImpl.createTable(MetaDataEndpointImpl.java:1639)
+at org.apache.phoenix.coprocessor.generated.MetaDataProtos$MetaDataService.callMethod(MetaDataProtos.java:16282)
+at org.apache.hadoop.hbase.regionserver.HRegion.execService(HRegion.java:7931)
+at org.apache.hadoop.hbase.regionserver.RSRpcServices.execServiceOnRegion(RSRpcServices.java:1969)
+at org.apache.hadoop.hbase.regionserver.RSRpcServices.execService(RSRpcServices.java:1951)
+at org.apache.hadoop.hbase.protobuf.generated.ClientProtos$ClientService$2.callBlockingMethod(ClientProtos.java:33652)
+at org.apache.hadoop.hbase.ipc.RpcServer.call(RpcServer.java:2191)
+at org.apache.hadoop.hbase.ipc.CallRunner.run(CallRunner.java:112)
+at org.apache.hadoop.hbase.ipc.RpcExecutor$Handler.run(RpcExecutor.java:183)
+at org.apache.hadoop.hbase.ipc.RpcExecutor$Handler.run(RpcExecutor.java:163)
+Caused by: java.lang.NoSuchMethodError: org.apache.hadoop.hbase.client.Scan.setRaw(Z)Lorg/apache/hadoop/hbase/client/Scan;
+at org.apache.phoenix.coprocessor.MetaDataEndpointImpl.buildDeletedTable(MetaDataEndpointImpl.java:1160)
+at org.apache.phoenix.coprocessor.MetaDataEndpointImpl.loadTable(MetaDataEndpointImpl.java:1267)
+at org.apache.phoenix.coprocessor.MetaDataEndpointImpl.createTable(MetaDataEndpointImpl.java:1468)
+... 9 more
+3 验证Spark1.6操作phoenix没问题的，测试通过：
+spark-shell --conf "spark.executor.extraClassPath=/opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.13.2-cdh5.11.2-
+client.jar" --driver-class-path /opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.13.2-cdh5.11.2-client.jar
+⾸首先在phoenix创建表，注意表名为⼤大写
+1)读操作：
+package spark55.phoenix
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.{SparkConf, SparkContext}
+/**
+* Created by hadoop on 18-2-19.
+*/
+object SparkReadPhoenixDF {
+def main(args: Array[String]): Unit = {
+val sparkConf = new SparkConf().setMaster("local[2]").setAppName("testPhonix")
+val sc = new SparkContext(sparkConf)
+val sqlContext = new SQLContext(sc)
+val df = sqlContext.read.format("org.apache.phoenix.spark").options(Map("table" -> "NCT", "zkUrl" -> "test3:2181")).load()
+df.filter(df("HOST") === "EU").show
+}
+}
+2)写：
+package spark55.phoenix
+import org.apache.spark.sql.{SQLContext, SaveMode}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.phoenix.spark._
+import org.apache.hadoop.conf.Configuration
+/**
+* 1. 创建表, 注意 info.companyname这⾥里里的info是列列族名
+* CREATE TABLE test_company (areacode VARCHAR, code VARCHAR, info.companyname VARCHAR CONSTRAINT PK PRIMARY KEY
+(areacode, code));
+*/
+object SparkSavePhoenixDF {
+def main(args: Array[String]): Unit = {
+val sparkConf = new SparkConf().setMaster("local[2]").setAppName("testPhonix")
+val sc = new SparkContext(sparkConf)
+val sqlContext = new SQLContext(sc)
+val dataSet = List(("1101", "54657"), ("1102", "64780"))
+import sqlContext.implicits._
+val df = sc.parallelize(dataSet).map(x=>(x._1, x._2)).toDF("ID", "NAME")
+df.write.format("org.apache.phoenix.spark").mode(SaveMode.Overwrite).options( Map("table" -> "NCT","zkUrl" -> "test3:2181")).save()
+}
+}
+实验⼆二： 整合spark2.1.0，使⽤用git源码版本 4.13.2-cdh5.11.2 : 不不通过
+1 下载、编译源码
+git clone -b 4.13-cdh5.11.2 https://github.com/apache/phoenix.git
+替换spark版本，需要在cloudera查找对应的版本，需要使⽤用scala2.11版本
+https://www.cloudera.com/documentation/spark2/latest/topics/spark2_packaging.html
+<spark.version>2.1.0.cloudera1</spark.version>
+<scala.version>2.11.8</scala.version>
+<scala.binary.version>2.11</scala.binary.version>
+编译源码：man package -DskipTests
+将phoenix-parcel/target/APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0.parcel.tar 上传⾄至服务器器：/opt/cloudera/parcel-repo
+将APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0.parcel.tar改名
+mv APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0.parcel.ta APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0-el7.parcel
+⽣生成sha⽂文件
+Sha1sum APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0-el7.parcel APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0-el7.parcel.sha
+修改：
+vim APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0-el7.parcel.sha
+不不需要更更改manifest.json ⽂文件，会⾃自动⽣生成APACHE_PHOENIX-4.14.0-cdh5.12.2.p0.0-el7.torrent⽂文件
+2 CDH 上安装phoenix
+删除原来的phoenix版本
+如下图，点击停⽤用，删除
+会删除/opt/cloudera/parcel-repo 下对应的phoenix安装包。
+拷⻉贝⽂文件：（同样的集群中每台机器器也⼀一样操作）
+ln -s /opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.13.2-cdh5.11.2-server.jar
+/opt/cloudera/parcels/CDH/lib/hbase/lib/phoenix-4.13.2-cdh5.11.2-server.jar
+3 验证Spark1.6操作phoenix没问题的，测试不不通过：
+spark2-shell --conf "spark.executor.extraClassPath=/opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.13.2-cdh5.11.2-
+client.jar" --driver-class-path /opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.13.2-cdh5.11.2-client.jar
+报如下错：
+scala> val df = sqlContext.read.format("org.apache.phoenix.spark").options(Map("table" -> "NCT", "zkUrl" -> "test3:2181")).load()
+java.lang.NoClassDefFoundError: org/apache/spark/sql/DataFrame
+at java.lang.Class.getDeclaredMethods0(Native Method)
+at java.lang.Class.privateGetDeclaredMethods(Class.java:2701)
+at java.lang.Class.getDeclaredMethod(Class.java:2128)
+at java.io.ObjectStreamClass.getPrivateMethod(ObjectStreamClass.java:1475)
+at java.io.ObjectStreamClass.access$1700(ObjectStreamClass.java:72)
+at java.io.ObjectStreamClass$2.run(ObjectStreamClass.java:498)
+at java.io.ObjectStreamClass$2.run(ObjectStreamClass.java:472)
+at java.security.AccessController.doPrivileged(Native Method)
+at java.io.ObjectStreamClass.<init>(ObjectStreamClass.java:472)
+at java.io.ObjectStreamClass.lookup(ObjectStreamClass.java:369)
+at java.io.ObjectOutputStream.writeObject0(ObjectOutputStream.java:1134)
+at java.io.ObjectOutputStream.defaultWriteFields(ObjectOutputStream.java:1548)
+at java.io.ObjectOutputStream.writeSerialData(ObjectOutputStream.java:1509)
+at java.io.ObjectOutputStream.writeOrdinaryObject(ObjectOutputStream.java:1432)
+at java.io.ObjectOutputStream.writeObject0(ObjectOutputStream.java:1178)
+at java.io.ObjectOutputStream.writeObject(ObjectOutputStream.java:348)
+at org.apache.spark.serializer.JavaSerializationStream.writeObject(JavaSerializer.scala:43)
+at org.apache.spark.serializer.JavaSerializerInstance.serialize(JavaSerializer.scala:100)
+at org.apache.spark.util.ClosureCleaner$.ensureSerializable(ClosureCleaner.scala:295)
+at org.apache.spark.util.ClosureCleaner$.org$apache$spark$util$ClosureCleaner$$clean(ClosureCleaner.scala:288)
+at org.apache.spark.util.ClosureCleaner$.clean(ClosureCleaner.scala:108)
+报错似乎是关于spark2.0的，我们的环境是spark2.1.0cloudera1的
+详细查：https://issues.apache.org/jira/browse/PHOENIX-3333
+
+
+实验⼆二： 整合spark2.1.0，使⽤用git源码版本 4.x-cdh5.11.2 : 通过
+
+1 ,编译4.x-cdh5.11.2,相关讨论可以查看，看讨论说，spark2.1版本是可以通过的。
+https://issues.apache.org/jira/browse/PHOENIX-4056?page=com.atlassian.jira.plugin.system.issuetabpanels%3Acommenttabpanel&
+focusedCommentId=16359006#comment-16359006
+2，下载、编译
+过程参考 实验⼆二
+git clone -b 4.13-cdh5.11.2 https://github.com/apache/phoenix.git
+spark2-shell --conf "spark.executor.extraClassPath=/opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.14.0-cdh5.12.2-
+SNAPSHOT-client.jar" --driver-class-path /opt/cloudera/parcels/APACHE_PHOENIX/lib/phoenix/phoenix-4.14.0-cdh5.12.2-SNAPSHOTclient.
+jar
+3 验证spark2.1.0操作phoenix 读写成功
